@@ -1,0 +1,15 @@
+{
+    "name": "siyuan-llm-brain",
+    "author": "Jayakuttan",
+    "version": "0.1.0",
+    "displayName": {
+        "default": "LLM Brain",
+        "zh_CN": "LLM Brain"
+    },
+    "description": {
+        "default": "AI Chat Plugin for SiYuan Note",
+        "zh_CN": "SiYuan Note 的 AI 聊天插件"
+    },
+    "icon": "iconChat",
+    "minAppVersion": "2.10.0"
+}
