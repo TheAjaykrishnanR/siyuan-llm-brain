@@ -314,38 +314,46 @@ function App() {
         const controller = new AbortController();
         abortControllerRef.current = controller;
 
-        try {
-            const result = await streamChat({
-                messages: messagesForLLM as any, // Send enhanced content
-                provider: activeSettingProvider,
-                apiKey: apiKeys[activeSettingProvider],
-                baseUrl: baseUrls[activeSettingProvider],
-                modelId: selectedModels[activeSettingProvider],
-            });
+        // Execute the streaming generation in the background so handleSend can return immediately
+        // and the UI can clear the input field.
+        const executeGeneration = async () => {
+            try {
+                const result = await streamChat({
+                    messages: messagesForLLM as any, // Send enhanced content
+                    provider: activeSettingProvider,
+                    apiKey: apiKeys[activeSettingProvider],
+                    baseUrl: baseUrls[activeSettingProvider],
+                    modelId: selectedModels[activeSettingProvider],
+                });
 
-            let fullContent = "";
-            for await (const chunk of result.textStream) {
-                if (controller.signal.aborted) break;
-                fullContent += chunk;
-                setAllMessages(prev => ({
-                    ...prev,
-                    [currentId]: (prev[currentId] || []).map(m => m.id === assistantMessageId ? { ...m, content: fullContent } : m)
-                }));
+                let fullContent = "";
+                for await (const chunk of result.textStream) {
+                    if (controller.signal.aborted) break;
+                    fullContent += chunk;
+                    setAllMessages(prev => ({
+                        ...prev,
+                        [currentId]: (prev[currentId] || []).map(m => m.id === assistantMessageId ? { ...m, content: fullContent } : m)
+                    }));
+                }
+            } catch (error: any) {
+                if (error.name === 'AbortError') {
+                    console.log('Chat aborted');
+                } else {
+                    console.error('Chat Error:', error);
+                    setAllMessages(prev => ({
+                        ...prev,
+                        [currentId]: (prev[currentId] || []).map(m => m.id === assistantMessageId ? { ...m, content: `Error: ${error.message}` } : m)
+                    }));
+                }
+            } finally {
+                setIsGenerating(false);
+                if (abortControllerRef.current === controller) {
+                    abortControllerRef.current = null;
+                }
             }
-        } catch (error: any) {
-            if (error.name === 'AbortError') {
-                console.log('Chat aborted');
-            } else {
-                console.error('Chat Error:', error);
-                setAllMessages(prev => ({
-                    ...prev,
-                    [currentId]: (prev[currentId] || []).map(m => m.id === assistantMessageId ? { ...m, content: `Error: ${error.message}` } : m)
-                }));
-            }
-        } finally {
-            setIsGenerating(false);
-            abortControllerRef.current = null;
-        }
+        };
+
+        executeGeneration();
     };
 
     const stopGeneration = () => {
