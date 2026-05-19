@@ -23,7 +23,7 @@ export interface StreamOptions {
 export const mapMessages = (msgs: Message[], provider?: Provider): CoreMessage[] => {
     return msgs.map(m => {
         if (m.role === "user" && m.attachments && m.attachments.length > 0) {
-            const isMultimodal = provider === "openai" || provider === "gemini" || provider === "claude";
+            const isMultimodal = provider === "openai" || provider === "gemini" || provider === "claude" || provider === "llamacpp";
             
             // Filter only image attachments
             const imageAttachments = m.attachments.filter(a => a.mediaType?.startsWith("image/"));
