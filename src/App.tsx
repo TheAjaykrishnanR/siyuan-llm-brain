@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import ChatInput from "@/components/chat-input";
+import { MessageItem } from "@/components/message-item";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { listModels, streamChat } from "@/lib/llm";
@@ -147,13 +148,19 @@ function App() {
 
     const messages = allMessages[activeChatId] || [];
 
-    // Persistence Effects
+    // Persistence Effects with Debounce to prevent UI blocking
     useEffect(() => {
-        localStorage.setItem("chat_messages_map", JSON.stringify(allMessages));
+        const timer = setTimeout(() => {
+            localStorage.setItem("chat_messages_map", JSON.stringify(allMessages));
+        }, 1000);
+        return () => clearTimeout(timer);
     }, [allMessages]);
 
     useEffect(() => {
-        localStorage.setItem("chat_history", JSON.stringify(chats));
+        const timer = setTimeout(() => {
+            localStorage.setItem("chat_history", JSON.stringify(chats));
+        }, 1000);
+        return () => clearTimeout(timer);
     }, [chats]);
 
     useEffect(() => {
@@ -223,6 +230,27 @@ function App() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Store latest state in refs for use in stable callbacks
+    const stateRef = useRef({ 
+        messages, 
+        activeChatId, 
+        activeSettingProvider, 
+        apiKeys, 
+        baseUrls, 
+        selectedModels 
+    });
+    
+    useEffect(() => {
+        stateRef.current = { 
+            messages, 
+            activeChatId, 
+            activeSettingProvider, 
+            apiKeys, 
+            baseUrls, 
+            selectedModels 
+        };
+    }, [messages, activeChatId, activeSettingProvider, apiKeys, baseUrls, selectedModels]);
 
     const handleSend = async (message: PromptInputMessage) => {
         if (!message.text.trim() && (!message.files || message.files.length === 0)) {
@@ -327,33 +355,36 @@ function App() {
         }
     };
 
-    const deleteMessage = (id: string) => {
+    const deleteMessage = useCallback((id: string) => {
         setAllMessages(prev => ({
             ...prev,
-            [activeChatId]: (prev[activeChatId] || []).filter(m => m.id !== id)
+            [stateRef.current.activeChatId]: (prev[stateRef.current.activeChatId] || []).filter(m => m.id !== id)
         }));
-    };
+    }, []);
 
-    const startEditing = (id: string, content: string) => {
+    const startEditing = useCallback((id: string, content: string) => {
         setEditingMessageId(id);
         setEditContent(content);
-    };
+    }, []);
 
-    const saveEdit = () => {
-        if (!editingMessageId) return;
+    const saveEdit = useCallback(() => {
         setAllMessages(prev => ({
             ...prev,
-            [activeChatId]: (prev[activeChatId] || []).map(m => m.id === editingMessageId ? { ...m, content: editContent } : m)
+            [stateRef.current.activeChatId]: (prev[stateRef.current.activeChatId] || []).map(m => m.id === editingMessageId ? { ...m, content: editContent } : m)
         }));
         setEditingMessageId(null);
-    };
+    }, [editingMessageId, editContent]);
 
-    const regenerateMessage = async (id: string) => {
-        const index = messages.findIndex(m => m.id === id);
+    const cancelEdit = useCallback(() => {
+        setEditingMessageId(null);
+    }, []);
+
+    const regenerateMessage = useCallback(async (id: string) => {
+        const { messages: currentMessages, activeChatId: currentId, activeSettingProvider: provider, apiKeys: keys, baseUrls: urls, selectedModels: models } = stateRef.current;
+        const index = currentMessages.findIndex(m => m.id === id);
         if (index === -1) return;
 
-        const currentId = activeChatId;
-        const history = messages.slice(0, index);
+        const history = currentMessages.slice(0, index);
         
         const assistantMessageId = nanoid();
         const assistantPlaceholder: Message = {
@@ -374,10 +405,10 @@ function App() {
         try {
             const result = await streamChat({
                 messages: history,
-                provider: activeSettingProvider,
-                apiKey: apiKeys[activeSettingProvider],
-                baseUrl: baseUrls[activeSettingProvider],
-                modelId: selectedModels[activeSettingProvider],
+                provider,
+                apiKey: keys[provider],
+                baseUrl: urls[provider],
+                modelId: models[provider],
             });
 
             let fullContent = "";
@@ -403,7 +434,7 @@ function App() {
             setIsGenerating(false);
             abortControllerRef.current = null;
         }
-    };
+    }, []);
 
     const handleModelChange = (model: string) => {
         setSelectedModels(prev => ({ ...prev, [activeSettingProvider]: model }));
@@ -427,21 +458,13 @@ function App() {
         setActiveChatId(newId);
     };
 
-    const preprocessLaTeX = (content: string) => {
-        return content
-            .replace(/\\\[/g, '$$$$')
-            .replace(/\\\]/g, '$$$$')
-            .replace(/\\\(/g, '$$')
-            .replace(/\\\)/g, '$$');
-    };
-
     useEffect(() => {
         const handleClickOutside = () => setContextMenu(null);
         window.addEventListener('click', handleClickOutside);
         return () => window.removeEventListener('click', handleClickOutside);
     }, []);
 
-    const handleContextMenu = (e: React.MouseEvent, messageId: string, content: string) => {
+    const handleContextMenu = useCallback((e: React.MouseEvent, messageId: string, content: string) => {
         e.preventDefault();
         setContextMenu({
             x: e.clientX,
@@ -449,7 +472,7 @@ function App() {
             messageId,
             content
         });
-    };
+    }, []);
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
@@ -610,90 +633,19 @@ function App() {
                         {activeView === "chat" ? (
                             <>
                                 {messages.map((message) => (
-                                    <div
+                                    <MessageItem 
                                         key={message.id}
-                                        className={`flex group/message ${
-                                            message.role === "user" ? "justify-end" : "justify-start w-full"
-                                        }`}
-                                        onContextMenu={(e) => handleContextMenu(e, message.id, message.content)}
-                                    >
-                                        <div
-                                            className={`flex gap-4 items-start ${
-                                                message.role === "user" ? "max-w-[85%] flex-row-reverse" : "w-full flex-row"
-                                            }`}
-                                        >
-                                            <div className={`size-8 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm ${
-                                                message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground border"
-                                            }`}>
-                                                {message.role === "user" ? "ME" : "AI"}
-                                            </div>
-                                            <div className={`flex-1 ${message.role === "user" ? "items-end flex flex-col" : "items-start w-full"}`}>
-                                                <div className={`min-h-8 flex items-center w-full ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                                                    {editingMessageId === message.id ? (
-                                                        <div className="flex flex-col gap-2 w-full min-w-[300px]">
-                                                            <textarea
-                                                                value={editContent}
-                                                                onChange={(e) => setEditContent(e.target.value)}
-                                                                className="w-full bg-muted border rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-1 focus:ring-primary/30 resize-none min-h-[100px]"
-                                                            />
-                                                            <div className="flex justify-end gap-2">
-                                                                <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => setEditingMessageId(null)}>Cancel</Button>
-                                                                <Button size="sm" className="h-7 text-[10px]" onClick={saveEdit}>Save</Button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className={`text-base ${
-                                                            message.role === "user" 
-                                                                ? "px-4 py-2.5 rounded-2xl shadow-sm bg-muted border" 
-                                                                : "w-full prose prose-base dark:prose-invert max-w-none"
-                                                        }`}>
-                                                            {message.role === "user" ? (
-                                                                message.content
-                                                            ) : (
-                                                                <ReactMarkdown 
-                                                                    remarkPlugins={[remarkMath, remarkGfm]} 
-                                                                    rehypePlugins={[rehypeKatex]}
-                                                                >
-                                                                    {preprocessLaTeX(message.content)}
-                                                                </ReactMarkdown>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className={`flex gap-1 opacity-0 group-hover/message:opacity-100 transition-opacity mt-1 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                                                    {message.role === "user" ? (
-                                                        <>
-                                                            <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground" onClick={() => startEditing(message.id, message.content)}>
-                                                                <Edit3Icon className="size-3" />
-                                                            </Button>
-                                                            <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-destructive" onClick={() => deleteMessage(message.id)}>
-                                                                <Trash2Icon className="size-3" />
-                                                            </Button>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground" onClick={() => regenerateMessage(message.id)}>
-                                                                <RefreshCwIcon className="size-3" />
-                                                            </Button>
-                                                            <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-destructive" onClick={() => deleteMessage(message.id)}>
-                                                                <Trash2Icon className="size-3" />
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                {message.attachments && message.attachments.length > 0 && (
-                                                    <Attachments variant="grid" className={message.role === "user" ? "justify-end" : "justify-start mt-2"}>
-                                                        {message.attachments.map((file, idx) => (
-                                                            <Attachment key={idx} data={{ ...file, id: nanoid() }}>
-                                                                <AttachmentPreview />
-                                                                <AttachmentInfo showMediaType />
-                                                            </Attachment>
-                                                        ))}
-                                                    </Attachments>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
+                                        message={message}
+                                        isEditing={editingMessageId === message.id}
+                                        editContent={editContent}
+                                        onEditContentChange={setEditContent}
+                                        onSaveEdit={saveEdit}
+                                        onCancelEdit={cancelEdit}
+                                        onStartEditing={startEditing}
+                                        onDelete={deleteMessage}
+                                        onRegenerate={regenerateMessage}
+                                        onContextMenu={handleContextMenu}
+                                    />
                                 ))}
                                 <div ref={messagesEndRef} />
                             </>
