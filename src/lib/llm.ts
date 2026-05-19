@@ -20,21 +20,32 @@ export interface StreamOptions {
     modelId?: string;
 }
 
-export const mapMessages = (msgs: Message[]): CoreMessage[] => {
+export const mapMessages = (msgs: Message[], provider?: Provider): CoreMessage[] => {
     return msgs.map(m => {
         if (m.role === "user" && m.attachments && m.attachments.length > 0) {
-            const content: UserContent = [
-                { type: "text", text: m.content },
-                ...m.attachments.map(a => ({
-                    type: "image" as const,
-                    image: a.url,
-                    mimeType: a.mediaType,
-                }))
-            ];
-            return {
-                role: "user",
-                content,
-            };
+            const isMultimodal = provider === "openai" || provider === "gemini" || provider === "claude";
+            
+            // Filter only image attachments
+            const imageAttachments = m.attachments.filter(a => a.mediaType?.startsWith("image/"));
+            
+            if (isMultimodal && imageAttachments.length > 0) {
+                const content: UserContent = [
+                    { type: "text", text: m.content },
+                    ...imageAttachments.map(a => ({
+                        type: "image" as const,
+                        image: a.url,
+                        mimeType: a.mediaType,
+                    }))
+                ];
+                return {
+                    role: "user",
+                    content,
+                };
+            }
+            
+            if (!isMultimodal && imageAttachments.length > 0) {
+                console.warn(`Provider ${provider} does not support image attachments. Ignoring ${imageAttachments.length} image(s).`);
+            }
         }
         return {
             role: m.role as "user" | "assistant",
@@ -87,7 +98,7 @@ export async function streamChat({ messages, provider, apiKey, baseUrl, modelId 
     }
 
     let model;
-    const coreMessages = mapMessages(messages);
+    const coreMessages = mapMessages(messages, provider);
 
     try {
         if (provider === "openai") {

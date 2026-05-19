@@ -3,6 +3,7 @@ import ChatInput from "@/components/chat-input";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { listModels, streamChat } from "@/lib/llm";
+import { getNoteContent } from "@/lib/siyuan";
 
 import { 
     Attachments, 
@@ -228,22 +229,44 @@ function App() {
             return;
         }
 
+        // Fetch content for note attachments
+        const noteAttachments = message.files?.filter(f => f.mediaType === "application/x-siyuan-note") || [];
+        let enhancedContent = message.text;
+
+        if (noteAttachments.length > 0) {
+            const noteContents = await Promise.all(
+                noteAttachments.map(async (n) => {
+                    const content = await getNoteContent(n.url);
+                    return `--- START OF NOTE: ${n.filename || n.name} ---\n${content}\n--- END OF NOTE: ${n.filename || n.name} ---`;
+                })
+            );
+            enhancedContent = `${message.text}\n\nContext from SiYuan Notes:\n${noteContents.join("\n\n")}`;
+        }
+
         const currentId = activeChatId;
         const newMessage: Message = {
             id: nanoid(),
             role: "user",
-            content: message.text,
+            content: message.text, // Store original text for UI
             attachments: message.files,
         };
 
         const updatedMessages = [...messages, newMessage];
         
+        // Use enhanced content for the actual LLM call but keep UI message clean
+        const messagesForLLM = updatedMessages.map(m => {
+            if (m.id === newMessage.id) {
+                return { ...m, content: enhancedContent };
+            }
+            return m;
+        });
+
         setAllMessages(prev => ({
             ...prev,
             [currentId]: updatedMessages
         }));
 
-        if (messages.length <= 1 && messages[0]?.content === "Hello! How can I help you today?") {
+        if (messages.length <= 1 && (messages[0]?.content === "Hello! How can I help you today?" || messages.length === 0)) {
             setChats(prev => prev.map(c => c.id === currentId ? { ...c, title: message.text.slice(0, 30) || "New Chat" } : c));
         }
 
@@ -265,7 +288,7 @@ function App() {
 
         try {
             const result = await streamChat({
-                messages: updatedMessages,
+                messages: messagesForLLM as any, // Send enhanced content
                 provider: activeSettingProvider,
                 apiKey: apiKeys[activeSettingProvider],
                 baseUrl: baseUrls[activeSettingProvider],

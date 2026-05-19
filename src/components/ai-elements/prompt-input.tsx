@@ -179,7 +179,7 @@ const captureScreenshot = async (): Promise<File | null> => {
 
 export interface AttachmentsContext {
   files: (FileUIPart & { id: string })[];
-  add: (files: File[] | FileList) => void;
+  add: (files: File | File[] | FileList | FileUIPart | (FileUIPart & { id: string }) | (FileUIPart & { id: string })[]) => void;
   remove: (id: string) => void;
   clear: () => void;
   openFileDialog: () => void;
@@ -260,21 +260,36 @@ export const PromptInputProvider = ({
   // oxlint-disable-next-line eslint(no-empty-function)
   const openRef = useRef<() => void>(() => {});
 
-  const add = useCallback((files: File[] | FileList) => {
-    const incoming = [...files];
+  const add = useCallback((files: File | File[] | FileList | FileUIPart | (FileUIPart & { id: string }) | (FileUIPart & { id: string })[]) => {
+    const incoming = Array.isArray(files) 
+      ? files 
+      : (typeof FileList !== 'undefined' && files instanceof FileList)
+        ? Array.from(files)
+        : [files];
+
     if (incoming.length === 0) {
       return;
     }
 
     setAttachmentFiles((prev) => [
       ...prev,
-      ...incoming.map((file) => ({
-        filename: file.name,
-        id: nanoid(),
-        mediaType: file.type,
-        type: "file" as const,
-        url: URL.createObjectURL(file),
-      })),
+      ...incoming.map((item) => {
+        if (typeof item === 'object' && item !== null && 'type' in item && item.type === 'file') {
+          const part = item as FileUIPart;
+          return {
+            ...part,
+            id: (part as any).id ?? nanoid(),
+          } as FileUIPart & { id: string };
+        }
+        const file = item as File;
+        return {
+          filename: file.name,
+          id: nanoid(),
+          mediaType: file.type,
+          type: "file" as const,
+          url: URL.createObjectURL(file),
+        };
+      }),
     ]);
   }, []);
 
@@ -575,9 +590,20 @@ export const PromptInput = ({
   );
 
   const addLocal = useCallback(
-    (fileList: File[] | FileList) => {
-      const incoming = [...fileList];
-      const accepted = incoming.filter((f) => matchesAccept(f));
+    (fileList: File | File[] | FileList | FileUIPart | (FileUIPart & { id: string }) | (FileUIPart & { id: string })[]) => {
+      const incoming = Array.isArray(fileList) 
+        ? fileList 
+        : (typeof FileList !== 'undefined' && fileList instanceof FileList)
+          ? Array.from(fileList)
+          : [fileList];
+
+      const accepted = incoming.filter((item) => {
+        if (typeof item === 'object' && item !== null && 'type' in item && item.type === 'file') {
+          return true;
+        }
+        return matchesAccept(item as File);
+      });
+
       if (incoming.length && accepted.length === 0) {
         onError?.({
           code: "accept",
@@ -585,8 +611,12 @@ export const PromptInput = ({
         });
         return;
       }
-      const withinSize = (f: File) =>
-        maxFileSize ? f.size <= maxFileSize : true;
+      const withinSize = (item: any) => {
+        if (typeof item === 'object' && item !== null && 'type' in item && item.type === 'file') {
+          return true;
+        }
+        return maxFileSize ? (item as File).size <= maxFileSize : true;
+      };
       const sized = accepted.filter(withinSize);
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
@@ -610,14 +640,23 @@ export const PromptInput = ({
           });
         }
         const next: (FileUIPart & { id: string })[] = [];
-        for (const file of capped) {
-          next.push({
-            filename: file.name,
-            id: nanoid(),
-            mediaType: file.type,
-            type: "file",
-            url: URL.createObjectURL(file),
-          });
+        for (const item of capped) {
+          if (typeof item === 'object' && item !== null && 'type' in item && item.type === 'file') {
+            const part = item as FileUIPart;
+            next.push({
+              ...part,
+              id: (part as any).id ?? nanoid(),
+            } as FileUIPart & { id: string });
+          } else {
+            const file = item as File;
+            next.push({
+              filename: file.name,
+              id: nanoid(),
+              mediaType: file.type,
+              type: "file",
+              url: URL.createObjectURL(file),
+            });
+          }
         }
         return [...prev, ...next];
       });
@@ -629,7 +668,7 @@ export const PromptInput = ({
     (id: string) =>
       setItems((prev) => {
         const found = prev.find((file) => file.id === id);
-        if (found?.url) {
+        if (found?.url && found.url.startsWith('blob:')) {
           URL.revokeObjectURL(found.url);
         }
         return prev.filter((file) => file.id !== id);
@@ -639,9 +678,20 @@ export const PromptInput = ({
 
   // Wrapper that validates files before calling provider's add
   const addWithProviderValidation = useCallback(
-    (fileList: File[] | FileList) => {
-      const incoming = [...fileList];
-      const accepted = incoming.filter((f) => matchesAccept(f));
+    (fileList: File | File[] | FileList | FileUIPart | (FileUIPart & { id: string }) | (FileUIPart & { id: string })[]) => {
+      const incoming = Array.isArray(fileList) 
+        ? fileList 
+        : (typeof FileList !== 'undefined' && fileList instanceof FileList)
+          ? Array.from(fileList)
+          : [fileList];
+
+      const accepted = incoming.filter((item) => {
+        if (typeof item === 'object' && item !== null && 'type' in item && item.type === 'file') {
+          return true;
+        }
+        return matchesAccept(item as File);
+      });
+
       if (incoming.length && accepted.length === 0) {
         onError?.({
           code: "accept",
@@ -649,8 +699,12 @@ export const PromptInput = ({
         });
         return;
       }
-      const withinSize = (f: File) =>
-        maxFileSize ? f.size <= maxFileSize : true;
+      const withinSize = (item: any) => {
+        if (typeof item === 'object' && item !== null && 'type' in item && item.type === 'file') {
+          return true;
+        }
+        return maxFileSize ? (item as File).size <= maxFileSize : true;
+      };
       const sized = accepted.filter(withinSize);
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
@@ -956,6 +1010,7 @@ export const PromptInputTextarea = ({
   onChange,
   onKeyDown,
   className,
+  ref,
   placeholder = "What would you like to know?",
   ...props
 }: PromptInputTextareaProps) => {
@@ -1054,6 +1109,7 @@ export const PromptInputTextarea = ({
 
   return (
     <InputGroupTextarea
+      ref={ref}
       className={cn("field-sizing-content max-h-32 min-h-10 text-xs", className)}
       name="message"
       onCompositionEnd={handleCompositionEnd}
