@@ -81,8 +81,17 @@ export async function listModels(provider: Provider, apiKey: string, baseUrl?: s
             const data = await resp.json();
             return data.data?.map((m: any) => m.id) || [];
         } else if (provider === "llamacpp") {
-            const url = baseUrl ? (baseUrl.endsWith('/') ? `${baseUrl}models` : `${baseUrl}/models`) : "http://localhost:8080/v1/models";
-            const resp = await fetch(url);
+            // For llamacpp, apiKey is the primary way to set the URL in the UI
+            let finalUrl = apiKey;
+            if (!finalUrl) finalUrl = baseUrl || "http://localhost:8080/v1";
+            
+            // Ensure it has /v1 for model listing if it looks like a base server URL
+            if (finalUrl && !finalUrl.endsWith("/v1") && !finalUrl.endsWith("/v1/")) {
+                finalUrl = finalUrl.endsWith("/") ? `${finalUrl}v1` : `${finalUrl}/v1`;
+            }
+            
+            const modelsUrl = finalUrl.endsWith('/') ? `${finalUrl}models` : `${finalUrl}/models`;
+            const resp = await fetch(modelsUrl);
             const data = await resp.json();
             return data.data?.map((m: any) => m.id) || ["llamacpp-default"];
         }
@@ -93,7 +102,7 @@ export async function listModels(provider: Provider, apiKey: string, baseUrl?: s
 }
 
 export async function streamChat({ messages, provider, apiKey, baseUrl, modelId }: StreamOptions) {
-    if (!apiKey) {
+    if (!apiKey && provider !== "llamacpp") {
         throw new Error(`API Key for ${provider} is missing. Please set it in Settings.`);
     }
 
@@ -127,13 +136,21 @@ export async function streamChat({ messages, provider, apiKey, baseUrl, modelId 
             });
             model = deepseek.chat(modelId || "deepseek-chat");
         } else if (provider === "llamacpp") {
-            // apiKey here is used as the baseURL for llama.cpp as per App.tsx settings UI
+            // For llamacpp, apiKey is the primary way to set the URL in the UI (labeled as Server URL)
+            let finalBaseUrl = apiKey;
+            if (!finalBaseUrl) finalBaseUrl = baseUrl || "http://localhost:8080/v1";
+            
+            // Ensure it has /v1 if using OpenAI compatibility layer of llama.cpp
+            if (finalBaseUrl && !finalBaseUrl.endsWith("/v1") && !finalBaseUrl.endsWith("/v1/")) {
+                finalBaseUrl = finalBaseUrl.endsWith("/") ? `${finalBaseUrl}v1` : `${finalBaseUrl}/v1`;
+            }
+
             const llamacpp = createOpenAI({
-                baseURL: baseUrl || (apiKey.endsWith("/v1") ? apiKey : `${apiKey}/v1`),
+                baseURL: finalBaseUrl,
                 apiKey: "not-needed",
                 compatibility: 'compatible',
             });
-            model = llamacpp.chat(modelId || "gpt-3.5-turbo"); // model name doesn't matter for llama.cpp usually
+            model = llamacpp.chat(modelId || "llamacpp-default"); 
         } else {
             throw new Error(`Unsupported provider: ${provider}`);
         }

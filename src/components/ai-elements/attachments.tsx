@@ -14,6 +14,7 @@ import {
   ImageIcon,
   Music2Icon,
   PaperclipIcon,
+  StickyNoteIcon,
   VideoIcon,
   XIcon,
 } from "lucide-react";
@@ -34,6 +35,7 @@ export type AttachmentMediaCategory =
   | "audio"
   | "document"
   | "source"
+  | "note"
   | "unknown";
 
 export type AttachmentVariant = "grid" | "inline" | "list";
@@ -42,6 +44,7 @@ const mediaCategoryIcons: Record<AttachmentMediaCategory, typeof ImageIcon> = {
   audio: Music2Icon,
   document: FileTextIcon,
   image: ImageIcon,
+  note: StickyNoteIcon,
   source: GlobeIcon,
   unknown: PaperclipIcon,
   video: VideoIcon,
@@ -60,6 +63,9 @@ export const getMediaCategory = (
 
   const mediaType = data.mediaType ?? "";
 
+  if (mediaType === "application/x-siyuan-note") {
+    return "note";
+  }
   if (mediaType.startsWith("image/")) {
     return "image";
   }

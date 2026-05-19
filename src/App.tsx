@@ -750,20 +750,22 @@ function App() {
                                                 onChange={(e) => setApiKeys(prev => ({ ...prev, [activeSettingProvider]: e.target.value }))}
                                             />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                                Base URL
-                                            </label>
-                                            <Input 
-                                                type="text" 
-                                                placeholder={`Enter ${activeSettingProvider} base URL`} 
-                                                value={baseUrls[activeSettingProvider]}
-                                                onChange={(e) => setBaseUrls(prev => ({ ...prev, [activeSettingProvider]: e.target.value }))}
-                                            />
-                                            <p className="text-[10px] text-muted-foreground">
-                                                Default: {DEFAULT_BASE_URLS[activeSettingProvider]}
-                                            </p>
-                                        </div>
+                                        {activeSettingProvider !== "llamacpp" && (
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                                    Base URL
+                                                </label>
+                                                <Input 
+                                                    type="text" 
+                                                    placeholder={`Enter ${activeSettingProvider} base URL`} 
+                                                    value={baseUrls[activeSettingProvider]}
+                                                    onChange={(e) => setBaseUrls(prev => ({ ...prev, [activeSettingProvider]: e.target.value }))}
+                                                />
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    Default: {DEFAULT_BASE_URLS[activeSettingProvider]}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="pt-4 flex gap-3">
                                         <Button className="flex-1" onClick={() => setActiveView("chat")}>Save and Close</Button>

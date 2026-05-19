@@ -57,6 +57,35 @@ export default function ChatInput({
     const { openFileDialog, files, remove, add } = usePromptInputAttachments();
     const controller = usePromptInputController();
 
+    // Automatically attach current note
+    useEffect(() => {
+        const handleDocSwitch = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            if (!detail || !detail.id) return;
+
+            // Check if already attached as the current note
+            const currentNote = files.find(f => (f as any).isCurrent);
+            if (currentNote && currentNote.url === detail.id) return;
+
+            // If a current note already exists but it's different, remove it first
+            if (currentNote) {
+                remove(currentNote.id);
+            }
+
+            add([{
+                id: detail.id,
+                filename: detail.title || "Current Note",
+                mediaType: "application/x-siyuan-note",
+                url: detail.id,
+                type: "file",
+                isCurrent: true // Mark as current note
+            }] as any);
+        };
+
+        window.addEventListener("siyuan-llm-brain-doc-switch", handleDocSwitch);
+        return () => window.removeEventListener("siyuan-llm-brain-doc-switch", handleDocSwitch);
+    }, [files, add, remove]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (
@@ -276,7 +305,7 @@ export default function ChatInput({
                                 onRemove={() => remove(file.id)}
                             >
                                 <AttachmentPreview />
-                                <span className="text-[10px] max-w-[100px] truncate">{file.filename}</span>
+                                <span className="text-[10px] max-w-[100px] truncate leading-tight">{file.filename}</span>
                                 <AttachmentRemove />
                             </Attachment>
                         ))}

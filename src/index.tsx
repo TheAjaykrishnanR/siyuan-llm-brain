@@ -1,4 +1,4 @@
-import { Plugin } from "siyuan";
+import { Plugin, fetchSyncPost } from "siyuan";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import "@/index.css";
@@ -24,6 +24,32 @@ export default class LLMBrainPlugin extends Plugin {
             init: (dock) => {
                 dock.element.classList.add("fn__flex-1", "fn__flex", "fn__flex-column", "siyuan-llm-brain-container", "dark");
                 
+                let currentDocId = "";
+                
+                const emitDoc = (id: string, title: string) => {
+                    if (id && id !== currentDocId) {
+                        currentDocId = id;
+                        window.dispatchEvent(new CustomEvent("siyuan-llm-brain-doc-switch", { 
+                            detail: { id, title } 
+                        }));
+                    }
+                };
+
+                // Track document switches
+                this.eventBus.on("switch-protyle", ({ detail }) => {
+                    emitDoc(detail.protyle.block.rootID, detail.protyle.title || "Current Note");
+                });
+
+                // Initial fetch for current doc on startup
+                fetchSyncPost("/api/query/sql", {
+                    stmt: "SELECT * FROM blocks WHERE type='d' ORDER BY updated DESC LIMIT 1"
+                }).then(results => {
+                    if (results.code === 0 && results.data && results.data.length > 0) {
+                        const doc = results.data[0];
+                        emitDoc(doc.id, doc.content || "Current Note");
+                    }
+                });
+
                 const root = createRoot(dock.element);
                 root.render(
                     <React.StrictMode>
