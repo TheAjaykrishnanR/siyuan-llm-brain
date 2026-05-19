@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import ChatInput from "@/components/chat-input";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
-import { streamChat } from "@/lib/llm";
+import { listModels, streamChat } from "@/lib/llm";
 
 import { 
     Attachments, 
@@ -58,6 +58,14 @@ interface BaseUrls {
     claude: string;
 }
 
+interface SelectedModels {
+    gemini: string;
+    deepseek: string;
+    openai: string;
+    llamacpp: string;
+    claude: string;
+}
+
 type Provider = keyof ApiKeys;
 
 const DEFAULT_BASE_URLS: BaseUrls = {
@@ -85,7 +93,7 @@ function App() {
         return localStorage.getItem("active_chat_id") || "1";
     });
     const [searchQuery, setSearchQuery] = useState("");
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [activeView, setActiveView] = useState<"chat" | "settings">("chat");
     const [activeSettingProvider, setActiveSettingProvider] = useState<Provider>(() => {
         return (localStorage.getItem("active_provider") as Provider) || "gemini";
@@ -97,6 +105,9 @@ function App() {
     const [editContent, setEditContent] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
+
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, messageId: string, content: string } | null>(null);
+
     const [apiKeys, setApiKeys] = useState<ApiKeys>(() => {
         const saved = localStorage.getItem("api_keys");
         return saved ? JSON.parse(saved) : {
@@ -111,6 +122,26 @@ function App() {
         const saved = localStorage.getItem("base_urls");
         return saved ? JSON.parse(saved) : DEFAULT_BASE_URLS;
     });
+
+    const [providerModels, setProviderModels] = useState<Record<Provider, string[]>>({
+        gemini: [],
+        deepseek: [],
+        openai: [],
+        llamacpp: [],
+        claude: [],
+    });
+
+    const [selectedModels, setSelectedModels] = useState<SelectedModels>(() => {
+        const saved = localStorage.getItem("selected_models");
+        return saved ? JSON.parse(saved) : {
+            gemini: "",
+            deepseek: "",
+            openai: "",
+            llamacpp: "",
+            claude: "",
+        };
+    });
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const messages = allMessages[activeChatId] || [];
@@ -143,6 +174,29 @@ function App() {
     useEffect(() => {
         localStorage.setItem("default_provider", defaultProvider);
     }, [defaultProvider]);
+
+    useEffect(() => {
+        localStorage.setItem("selected_models", JSON.stringify(selectedModels));
+    }, [selectedModels]);
+
+    // Model Fetching Logic
+    const fetchModelsForProvider = async (provider: Provider) => {
+        const key = apiKeys[provider];
+        const url = baseUrls[provider];
+        if (key || provider === "llamacpp") {
+            const models = await listModels(provider, key, url);
+            setProviderModels(prev => ({ ...prev, [provider]: models }));
+            
+            // Auto-select first model if none selected
+            if (!selectedModels[provider] && models.length > 0) {
+                setSelectedModels(prev => ({ ...prev, [provider]: models[0] }));
+            }
+        }
+    };
+
+    useEffect(() => {
+        fetchModelsForProvider(activeSettingProvider);
+    }, [activeSettingProvider, apiKeys, baseUrls]);
 
     const filteredChats = chats.filter(chat => 
         chat.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -215,6 +269,7 @@ function App() {
                 provider: activeSettingProvider,
                 apiKey: apiKeys[activeSettingProvider],
                 baseUrl: baseUrls[activeSettingProvider],
+                modelId: selectedModels[activeSettingProvider],
             });
 
             let fullContent = "";
@@ -299,6 +354,7 @@ function App() {
                 provider: activeSettingProvider,
                 apiKey: apiKeys[activeSettingProvider],
                 baseUrl: baseUrls[activeSettingProvider],
+                modelId: selectedModels[activeSettingProvider],
             });
 
             let fullContent = "";
@@ -324,6 +380,10 @@ function App() {
             setIsGenerating(false);
             abortControllerRef.current = null;
         }
+    };
+
+    const handleModelChange = (model: string) => {
+        setSelectedModels(prev => ({ ...prev, [activeSettingProvider]: model }));
     };
 
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -352,8 +412,53 @@ function App() {
             .replace(/\\\)/g, '$$');
     };
 
+    useEffect(() => {
+        const handleClickOutside = () => setContextMenu(null);
+        window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    const handleContextMenu = (e: React.MouseEvent, messageId: string, content: string) => {
+        e.preventDefault();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            messageId,
+            content
+        });
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        setContextMenu(null);
+    };
+
     return (
-        <div className="flex h-full w-full bg-background text-foreground overflow-hidden font-sans">
+        <div className="flex h-full w-full bg-background text-foreground overflow-hidden font-sans select-text">
+            {/* Context Menu */}
+            {contextMenu && (
+                <div 
+                    className="fixed z-[9999] bg-popover border rounded-md shadow-md py-1 min-w-[120px] animate-in fade-in zoom-in-95 duration-100"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button 
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                        onClick={() => copyToClipboard(contextMenu.content)}
+                    >
+                        Copy Text
+                    </button>
+                    <button 
+                        className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                        onClick={() => {
+                            deleteMessage(contextMenu.messageId);
+                            setContextMenu(null);
+                        }}
+                    >
+                        Delete Message
+                    </button>
+                </div>
+            )}
             {/* Sidebar */}
             <aside 
                 className={`flex flex-col border-r bg-muted/30 transition-[margin] duration-300 ease-in-out overflow-hidden shrink-0 ${
@@ -487,6 +592,7 @@ function App() {
                                         className={`flex group/message ${
                                             message.role === "user" ? "justify-end" : "justify-start w-full"
                                         }`}
+                                        onContextMenu={(e) => handleContextMenu(e, message.id, message.content)}
                                     >
                                         <div
                                             className={`flex gap-4 items-start ${
@@ -653,6 +759,9 @@ function App() {
                                     onSend={handleSend} 
                                     isGenerating={isGenerating} 
                                     onStop={stopGeneration}
+                                    models={providerModels[activeSettingProvider]}
+                                    selectedModel={selectedModels[activeSettingProvider]}
+                                    onModelChange={handleModelChange}
                                 />
                             </PromptInputProvider>
                         </div>

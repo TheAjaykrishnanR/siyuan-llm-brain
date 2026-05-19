@@ -8,7 +8,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 
-import { AtSignIcon, PaperclipIcon, ImageIcon, FileTextIcon, StickyNoteIcon, SquareIcon } from "lucide-react";
+import { AtSignIcon, PaperclipIcon, ImageIcon, FileTextIcon, StickyNoteIcon, SquareIcon, ChevronDownIcon } from "lucide-react";
 import { ArrowUpIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
@@ -19,14 +19,30 @@ import {
     AttachmentPreview, 
     AttachmentRemove 
 } from "@/components/ai-elements/attachments";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ChatInputProps {
     onSend: (message: PromptInputMessage) => void | Promise<void>;
     isGenerating?: boolean;
     onStop?: () => void;
+    models: string[];
+    selectedModel: string;
+    onModelChange: (model: string) => void;
 }
 
-export default function ChatInput({ onSend, isGenerating, onStop }: ChatInputProps) {
+export default function ChatInput({ 
+    onSend, 
+    isGenerating, 
+    onStop, 
+    models, 
+    selectedModel, 
+    onModelChange 
+}: ChatInputProps) {
     const [showAtMenu, setShowAtMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const buttonContainerRef = useRef<HTMLDivElement>(null);
@@ -150,14 +166,36 @@ export default function ChatInput({ onSend, isGenerating, onStop }: ChatInputPro
             {/* Footer */}
             <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center gap-3">
-                    <PromptInputButton
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-[11px] gap-2 text-muted-foreground/70 hover:text-foreground hover:bg-white/5 px-2 rounded-md"
-                    >
-                        <PaperclipIcon size={13} />
-                        <span>Auto</span>
-                    </PromptInputButton>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-[11px] gap-2 text-muted-foreground/70 hover:text-foreground hover:bg-white/5 px-2 rounded-md"
+                            >
+                                <PaperclipIcon size={13} />
+                                <span className="max-w-[100px] truncate">{selectedModel || "Auto"}</span>
+                                <ChevronDownIcon size={10} className="opacity-50" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-[200px] max-h-[300px] overflow-y-auto">
+                            {models.length === 0 ? (
+                                <div className="px-2 py-1.5 text-[11px] text-muted-foreground text-center">
+                                    No models found. Check API key.
+                                </div>
+                            ) : (
+                                models.map((model) => (
+                                    <DropdownMenuItem 
+                                        key={model} 
+                                        className={`text-[11px] ${selectedModel === model ? "bg-accent text-accent-foreground" : ""}`}
+                                        onClick={() => onModelChange(model)}
+                                    >
+                                        {model}
+                                    </DropdownMenuItem>
+                                ))
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <PromptInputButton
                         variant="ghost"
                         size="sm"
