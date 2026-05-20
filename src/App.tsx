@@ -737,8 +737,11 @@ function App() {
                 </main>
 
                 {activeView === "chat" && (
-                    <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-background via-background/90 to-transparent pt-10">
-                        <div className="mx-auto max-w-3xl">
+                    <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 pb-8 pointer-events-none overflow-visible">
+                        {/* The Glow - Positioned absolute to the input area's bottom center */}
+                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-48 bg-gradient-to-t from-white/[0.12] to-transparent blur-3xl rounded-[100%] pointer-events-none" />
+                        
+                        <div className="mx-auto max-w-3xl relative pointer-events-auto">
                             <PromptInputProvider>
                                 <ChatInput 
                                     onSend={handleSend} 

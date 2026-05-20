@@ -210,7 +210,7 @@ export default function ChatInput({
     return (
         <PromptInput
             onSubmit={handleSubmit}
-            className="bg-[#121212] border border-white/10 rounded-2xl p-3 flex flex-col shadow-2xl relative"
+            className="bg-white/[0.05] backdrop-blur-2xl border border-white/10 rounded-2xl p-3 flex flex-col shadow-2xl relative"
         >
             {/* Note Search Popover */}
             {showAtMenu && (
