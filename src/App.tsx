@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Plugin } from "siyuan";
 import ChatInput from "@/components/chat-input";
 import { MessageItem } from "@/components/message-item";
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
@@ -78,7 +79,11 @@ const DEFAULT_BASE_URLS: BaseUrls = {
     claude: "https://api.anthropic.com/v1",
 };
 
-function App() {
+interface AppProps {
+    plugin?: Plugin;
+}
+
+function App({ plugin }: AppProps) {
     const [allMessages, setAllMessages] = useState<ChatMessages>(() => {
         const saved = localStorage.getItem("chat_messages_map");
         return saved ? JSON.parse(saved) : {
@@ -167,13 +172,70 @@ function App() {
         localStorage.setItem("active_chat_id", activeChatId);
     }, [activeChatId]);
 
-    useEffect(() => {
-        localStorage.setItem("api_keys", JSON.stringify(apiKeys));
-    }, [apiKeys]);
+    const isApiKeysLoadedRef = useRef(false);
+    const isBaseUrlsLoadedRef = useRef(false);
 
     useEffect(() => {
-        localStorage.setItem("base_urls", JSON.stringify(baseUrls));
-    }, [baseUrls]);
+        if (plugin) {
+            plugin.loadData("api_keys").then((data) => {
+                if (data) {
+                    setApiKeys(prev => ({
+                        ...prev,
+                        ...data
+                    }));
+                }
+                isApiKeysLoadedRef.current = true;
+            }).catch((err) => {
+                console.error("Failed to load api_keys from SiYuan", err);
+                isApiKeysLoadedRef.current = true;
+            });
+        } else {
+            isApiKeysLoadedRef.current = true;
+        }
+    }, [plugin]);
+
+    useEffect(() => {
+        if (plugin) {
+            plugin.loadData("base_urls").then((data) => {
+                if (data) {
+                    setBaseUrls(prev => ({
+                        ...prev,
+                        ...data
+                    }));
+                }
+                isBaseUrlsLoadedRef.current = true;
+            }).catch((err) => {
+                console.error("Failed to load base_urls from SiYuan", err);
+                isBaseUrlsLoadedRef.current = true;
+            });
+        } else {
+            isBaseUrlsLoadedRef.current = true;
+        }
+    }, [plugin]);
+
+    useEffect(() => {
+        if (!isApiKeysLoadedRef.current) return;
+        const timer = setTimeout(() => {
+            localStorage.setItem("api_keys", JSON.stringify(apiKeys));
+            if (plugin) {
+                plugin.saveData("api_keys", apiKeys)
+                    .catch(err => console.error("Failed to save api_keys to SiYuan", err));
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [apiKeys, plugin]);
+
+    useEffect(() => {
+        if (!isBaseUrlsLoadedRef.current) return;
+        const timer = setTimeout(() => {
+            localStorage.setItem("base_urls", JSON.stringify(baseUrls));
+            if (plugin) {
+                plugin.saveData("base_urls", baseUrls)
+                    .catch(err => console.error("Failed to save base_urls to SiYuan", err));
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [baseUrls, plugin]);
 
     useEffect(() => {
         localStorage.setItem("active_provider", activeSettingProvider);
@@ -727,8 +789,8 @@ function App() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="pt-4 flex gap-3">
-                                        <Button className="flex-1" onClick={() => setActiveView("chat")}>Save and Close</Button>
+                                    <div className="pt-4 text-center">
+                                        <span className="text-xs text-muted-foreground/60 italic">Settings are saved automatically</span>
                                     </div>
                                 </div>
                             </div>

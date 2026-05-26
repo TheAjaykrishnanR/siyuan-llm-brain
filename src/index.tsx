@@ -54,7 +54,7 @@ export default class LLMBrainPlugin extends Plugin {
                 root.render(
                     <React.StrictMode>
                         <ThemeProvider defaultTheme="dark" storageKey="siyuan-llm-brain-theme">
-                            <App />
+                            <App plugin={this} />
                         </ThemeProvider>
                     </React.StrictMode>
                 );
