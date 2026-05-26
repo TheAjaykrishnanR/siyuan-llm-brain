@@ -517,6 +517,20 @@ function App({ plugin }: AppProps) {
         setActiveSettingProvider(p);
     };
 
+    const handleRevertApiKey = () => {
+        setApiKeys(prev => ({
+            ...prev,
+            [activeSettingProvider]: activeSettingProvider === "llamacpp" ? "http://localhost:8080/v1" : ""
+        }));
+    };
+
+    const handleRevertBaseUrl = () => {
+        setBaseUrls(prev => ({
+            ...prev,
+            [activeSettingProvider]: DEFAULT_BASE_URLS[activeSettingProvider]
+        }));
+    };
+
     const createNewChat = () => {
         const newId = nanoid();
         const newChat: Chat = { id: newId, title: "New Chat" };
@@ -765,24 +779,57 @@ function App({ plugin }: AppProps) {
                                             <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                                 {activeSettingProvider === "llamacpp" ? "Server URL" : "API Key"}
                                             </label>
-                                            <Input 
-                                                type={activeSettingProvider === "llamacpp" ? "text" : "password"} 
-                                                placeholder={activeSettingProvider === "llamacpp" ? "http://localhost:8080" : `Enter ${activeSettingProvider} API key`} 
-                                                value={apiKeys[activeSettingProvider]}
-                                                onChange={(e) => setApiKeys(prev => ({ ...prev, [activeSettingProvider]: e.target.value }))}
-                                            />
+                                            {activeSettingProvider === "llamacpp" ? (
+                                                <div className="flex gap-2">
+                                                    <Input 
+                                                        type="text" 
+                                                        placeholder="http://localhost:8080" 
+                                                        value={apiKeys[activeSettingProvider]}
+                                                        onChange={(e) => setApiKeys(prev => ({ ...prev, [activeSettingProvider]: e.target.value }))}
+                                                        className="flex-1"
+                                                    />
+                                                    <Button
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="size-9 shrink-0"
+                                                        onClick={handleRevertApiKey}
+                                                        title="Revert to default Server URL"
+                                                    >
+                                                        <RefreshCwIcon className="size-4" />
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <Input 
+                                                    type="password" 
+                                                    placeholder={`Enter ${activeSettingProvider} API key`} 
+                                                    value={apiKeys[activeSettingProvider]}
+                                                    onChange={(e) => setApiKeys(prev => ({ ...prev, [activeSettingProvider]: e.target.value }))}
+                                                />
+                                            )}
                                         </div>
                                         {activeSettingProvider !== "llamacpp" && (
                                             <div className="space-y-2">
                                                 <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                                     Base URL
                                                 </label>
-                                                <Input 
-                                                    type="text" 
-                                                    placeholder={`Enter ${activeSettingProvider} base URL`} 
-                                                    value={baseUrls[activeSettingProvider]}
-                                                    onChange={(e) => setBaseUrls(prev => ({ ...prev, [activeSettingProvider]: e.target.value }))}
-                                                />
+                                                <div className="flex gap-2">
+                                                    <Input 
+                                                        type="text" 
+                                                        placeholder={`Enter ${activeSettingProvider} base URL`} 
+                                                        value={baseUrls[activeSettingProvider]}
+                                                        onChange={(e) => setBaseUrls(prev => ({ ...prev, [activeSettingProvider]: e.target.value }))}
+                                                        className="flex-1"
+                                                    />
+                                                    <Button
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="size-9 shrink-0"
+                                                        onClick={handleRevertBaseUrl}
+                                                        title="Revert to default Base URL"
+                                                    >
+                                                        <RefreshCwIcon className="size-4" />
+                                                    </Button>
+                                                </div>
                                                 <p className="text-[10px] text-muted-foreground">
                                                     Default: {DEFAULT_BASE_URLS[activeSettingProvider]}
                                                 </p>
