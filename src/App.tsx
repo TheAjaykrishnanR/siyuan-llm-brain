@@ -114,6 +114,7 @@ function App({ plugin }: AppProps) {
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, messageId: string, content: string } | null>(null);
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
     const [apiKeys, setApiKeys] = useState<ApiKeys>(() => {
         const saved = localStorage.getItem("api_keys");
@@ -712,7 +713,18 @@ function App({ plugin }: AppProps) {
                     </div>
                 </div>
 
-                <main className="flex-1 overflow-y-auto px-4 py-12 md:px-6">
+                <main 
+                    className="flex-1 overflow-y-auto px-4 py-12 md:px-6"
+                    onClick={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.tagName === "IMG") {
+                            const src = target.getAttribute("src");
+                            if (src) {
+                                setPreviewImageUrl(src);
+                            }
+                        }
+                    }}
+                >
                     <div className="mx-auto max-w-3xl space-y-16 pb-32">
                         {activeView === "chat" ? (
                             <>
@@ -861,6 +873,30 @@ function App({ plugin }: AppProps) {
                                     onModelChange={handleModelChange}
                                 />
                             </PromptInputProvider>
+                        </div>
+                    </div>
+                )}
+
+                {previewImageUrl && (
+                    <div 
+                        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+                        onClick={() => setPreviewImageUrl(null)}
+                    >
+                        <button 
+                            className="absolute top-4 right-4 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer"
+                            onClick={() => setPreviewImageUrl(null)}
+                        >
+                            <XIcon className="size-6" />
+                        </button>
+                        <div 
+                            className="relative max-w-[90vw] max-h-[85vh] p-2 animate-in zoom-in-95 duration-200"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <img 
+                                src={previewImageUrl} 
+                                alt="Preview" 
+                                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl border border-white/10"
+                            />
                         </div>
                     </div>
                 )}
