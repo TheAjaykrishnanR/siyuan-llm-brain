@@ -88,13 +88,19 @@ export const MessageItem = React.memo(({
                             }`}>
                                 {message.role === "user" ? (
                                     message.content
-                                ) : (
+                                ) : message.content ? (
                                     <ReactMarkdown 
                                         remarkPlugins={[remarkMath, remarkGfm]} 
                                         rehypePlugins={[rehypeKatex]}
                                     >
                                         {preprocessLaTeX(message.content)}
                                     </ReactMarkdown>
+                                ) : (
+                                    <div className="flex items-center gap-1.5 py-3 px-2">
+                                        <div className="size-2 rounded-full bg-muted-foreground/50 animate-dot-pulse-1" />
+                                        <div className="size-2 rounded-full bg-muted-foreground/50 animate-dot-pulse-2" />
+                                        <div className="size-2 rounded-full bg-muted-foreground/50 animate-dot-pulse-3" />
+                                    </div>
                                 )}
                             </div>
                         )}
