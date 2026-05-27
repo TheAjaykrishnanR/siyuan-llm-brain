@@ -210,7 +210,7 @@ export default function ChatInput({
     return (
         <PromptInput
             onSubmit={handleSubmit}
-            className="bg-white/[0.05] backdrop-blur-2xl border border-white/10 rounded-2xl p-3 flex flex-col shadow-2xl relative"
+            className="@container bg-white/[0.05] backdrop-blur-2xl border border-white/10 rounded-2xl p-3 flex flex-col shadow-2xl relative"
         >
             {/* Note Search Popover */}
             {showAtMenu && (
@@ -325,8 +325,8 @@ export default function ChatInput({
             </PromptInputBody>
 
             {/* Footer */}
-            <div className="flex items-center justify-between pt-2">
-                <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between pt-2 gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
@@ -334,9 +334,9 @@ export default function ChatInput({
                                 size="sm"
                                 className="h-8 text-[11px] gap-2 text-muted-foreground/70 hover:text-foreground hover:bg-white/5 px-2 rounded-md"
                             >
-                                <PaperclipIcon size={13} />
-                                <span className="max-w-[100px] truncate">{selectedModel || "Auto"}</span>
-                                <ChevronDownIcon size={10} className="opacity-50" />
+                                <PaperclipIcon size={13} className="shrink-0" />
+                                <span className="max-w-[100px] truncate hidden @xs:inline">{selectedModel || "Auto"}</span>
+                                <ChevronDownIcon size={10} className="opacity-50 shrink-0 hidden @xs:inline" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-[200px] max-h-[300px] overflow-y-auto">
@@ -363,8 +363,8 @@ export default function ChatInput({
                         className="h-8 text-[11px] gap-2 text-muted-foreground/70 hover:text-foreground hover:bg-white/5 px-2 rounded-md"
                         onClick={openFileDialog}
                     >
-                        <ImageIcon size={13} />
-                        <span>Images</span>
+                        <ImageIcon size={13} className="shrink-0" />
+                        <span className="hidden @xs:inline">Images</span>
                     </PromptInputButton>
                 </div>
                 <Button

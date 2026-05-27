@@ -8,11 +8,12 @@ import { ThemeProvider } from "@/components/theme-provider";
 const DOCK_TYPE = "siyuan-llm-brain-dock";
 
 export default class LLMBrainPlugin extends Plugin {
+    private dock: any;
 
     onload() {
         this.addIcons(`<symbol id="iconChat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></symbol>`);
 
-        this.addDock({
+        this.dock = this.addDock({
             config: {
                 position: "RightTop",
                 size: { width: 300, height: 0 },
@@ -61,6 +62,34 @@ export default class LLMBrainPlugin extends Plugin {
             },
             destroy: () => {
                 console.log("LLM Brain dock destroyed");
+            }
+        });
+
+    }
+
+    onLayoutReady() {
+        const dockType = this.dock?.model?.type || DOCK_TYPE;
+        this.addTopBar({
+            icon: "iconChat",
+            title: this.i18n.chatWithNotes,
+            position: "right",
+            callback: () => {
+                const dockBtn = document.querySelector('.dock [data-type*="siyuan-llm-brain-dock"], .dock__item[data-type*="siyuan-llm-brain-dock"]') as HTMLElement;
+                if (dockBtn) {
+                    dockBtn.click();
+                } else {
+                    const layout = window.siyuan.layout;
+                    if (layout) {
+                        const dock = [layout.leftDock, layout.rightDock, layout.bottomDock].find(
+                            (d) => d && d.data && (dockType in d.data)
+                        );
+                        if (dock) {
+                            dock.toggleModel(dockType);
+                        } else {
+                            layout.rightDock?.toggleModel(dockType);
+                        }
+                    }
+                }
             }
         });
     }
