@@ -3,7 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 
-export type Provider = "gemini" | "openai" | "claude" | "deepseek" | "llamacpp";
+export type Provider = string;
 
 export interface Message {
     id: string;
@@ -55,7 +55,8 @@ export const mapMessages = (msgs: Message[], provider?: Provider): CoreMessage[]
 };
 
 export async function listModels(provider: Provider, apiKey: string, baseUrl?: string): Promise<string[]> {
-    if (!apiKey && provider !== "llamacpp") return [];
+    const isStandard = ["gemini", "openai", "claude", "deepseek", "llamacpp"].includes(provider);
+    if (isStandard && !apiKey && provider !== "llamacpp") return [];
 
     try {
         if (provider === "openai") {
@@ -94,6 +95,16 @@ export async function listModels(provider: Provider, apiKey: string, baseUrl?: s
             const resp = await fetch(modelsUrl);
             const data = await resp.json();
             return data.data?.map((m: any) => m.id) || ["llamacpp-default"];
+        } else {
+            const url = baseUrl ? (baseUrl.endsWith('/') ? `${baseUrl}models` : `${baseUrl}/models`) : "";
+            if (!url) return [];
+            const headers: Record<string, string> = {};
+            if (apiKey) {
+                headers["Authorization"] = `Bearer ${apiKey}`;
+            }
+            const resp = await fetch(url, { headers });
+            const data = await resp.json();
+            return data.data?.map((m: any) => m.id) || [];
         }
     } catch (e) {
         console.error(`Failed to list models for ${provider}:`, e);
@@ -102,7 +113,8 @@ export async function listModels(provider: Provider, apiKey: string, baseUrl?: s
 }
 
 export async function streamChat({ messages, provider, apiKey, baseUrl, modelId }: StreamOptions) {
-    if (!apiKey && provider !== "llamacpp") {
+    const isStandard = ["gemini", "openai", "claude", "deepseek", "llamacpp"].includes(provider);
+    if (isStandard && !apiKey && provider !== "llamacpp") {
         throw new Error(`API Key for ${provider} is missing. Please set it in Settings.`);
     }
 
@@ -152,7 +164,12 @@ export async function streamChat({ messages, provider, apiKey, baseUrl, modelId 
             });
             model = llamacpp.chat(modelId || "llamacpp-default"); 
         } else {
-            throw new Error(`Unsupported provider: ${provider}`);
+            const customOpenAI = createOpenAI({
+                baseURL: baseUrl,
+                apiKey: apiKey || "not-needed",
+                compatibility: 'compatible',
+            });
+            model = customOpenAI.chat(modelId || "default");
         }
 
         const result = await streamText({

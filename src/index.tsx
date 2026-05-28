@@ -38,7 +38,8 @@ export default class LLMBrainPlugin extends Plugin {
 
                 // Track document switches
                 this.eventBus.on("switch-protyle", ({ detail }) => {
-                    emitDoc(detail.protyle.block.rootID, detail.protyle.title || "Current Note");
+                    const titleText = (detail.protyle?.title?.editElement?.textContent || "").trim() || "Current Note";
+                    emitDoc(detail.protyle.block.rootID, titleText);
                 });
 
                 // Initial fetch for current doc on startup
