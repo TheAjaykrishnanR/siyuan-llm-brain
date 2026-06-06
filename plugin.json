@@ -11,5 +11,6 @@
         "zh_CN": "SiYuan Note 的 AI 聊天插件"
     },
     "icon": "iconChat",
-    "minAppVersion": "2.10.0"
+    "minAppVersion": "2.10.0",
+    "frontends": ["desktop", "browser-desktop"]
 }

@@ -141,6 +141,9 @@ function App({ plugin }: AppProps) {
     const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLElement>(null);
+    const shouldAutoScrollRef = useRef(true);
+    const isProgrammaticScrollRef = useRef(false);
 
     const messages = allMessages[activeChatId] || [];
 
@@ -456,13 +459,58 @@ function App({ plugin }: AppProps) {
         }
     };
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollToBottom = (behavior: "smooth" | "auto" = "auto") => {
+        if (behavior === "smooth") {
+            isProgrammaticScrollRef.current = true;
+        }
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTo({
+                top: scrollContainerRef.current.scrollHeight,
+                behavior
+            });
+        } else {
+            messagesEndRef.current?.scrollIntoView({ behavior });
+        }
     };
 
+    const prevMessagesLengthRef = useRef(messages.length);
+    const prevActiveChatIdRef = useRef(activeChatId);
+    const prevActiveViewRef = useRef(activeView);
+
     useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+        const viewChanged = prevActiveViewRef.current !== activeView;
+        const chatChanged = prevActiveChatIdRef.current !== activeChatId;
+        const lengthChanged = prevMessagesLengthRef.current !== messages.length;
+        
+        prevActiveViewRef.current = activeView;
+        prevActiveChatIdRef.current = activeChatId;
+        prevMessagesLengthRef.current = messages.length;
+
+        if (activeView !== "chat") return;
+
+        if (viewChanged || chatChanged || lengthChanged) {
+            shouldAutoScrollRef.current = true;
+            scrollToBottom("smooth");
+        } else if (shouldAutoScrollRef.current) {
+            scrollToBottom("auto");
+        }
+    }, [messages, activeChatId, activeView]);
+
+    const handleScroll = () => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 100;
+        
+        if (isProgrammaticScrollRef.current) {
+            if (isAtBottom) {
+                isProgrammaticScrollRef.current = false;
+            }
+            return;
+        }
+
+        shouldAutoScrollRef.current = isAtBottom;
+    };
 
     // Store latest state in refs for use in stable callbacks
     const stateRef = useRef({ 
@@ -954,6 +1002,8 @@ function App({ plugin }: AppProps) {
                 </div>
 
                 <main 
+                    ref={scrollContainerRef}
+                    onScroll={handleScroll}
                     className="flex-1 overflow-y-auto px-4 py-12 md:px-6"
                     onClick={(e) => {
                         const target = e.target as HTMLElement;
